@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FACE / Conformación de Empresas INEGI 2026</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS para lectura, modificación en caliente y escritura de Excel -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .custom-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+  <!-- HEADER -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow">
+          <i class="fa-solid fa-file-pen text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-tight">Auditor de FACE / Conformación de Empresas INEGI 2026</h1>
+          <p class="text-xs text-slate-400">Verificación, validación y edición directa del archivo Excel</p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center gap-2">
+        <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow flex items-center gap-2">
+          <i class="fa-solid fa-folder-open"></i> Subir Archivo (.xlsx)
+          <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
+        </label>
+        <button id="btnSaveModified" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow flex items-center gap-2 disabled:opacity-50" disabled>
+          <i class="fa-solid fa-floppy-disk"></i> Descargar Excel Modificado
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="max-w-7xl mx-auto w-full px-4 py-6 flex-1 flex flex-col gap-4">
+    
+    <!-- BARRA DE INFORMACIÓN Y FILTROS -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-4 text-sm">
+        <div>
+          <span class="text-xs text-slate-400 font-medium block">Archivo en memoria:</span>
+          <span id="currentFileName" class="font-semibold text-slate-700">Ningún archivo cargado</span>
+        </div>
+        <div class="h-8 w-px bg-slate-200 hidden sm:block"></div>
+        <div>
+          <label class="text-xs text-slate-400 font-medium block">Hoja seleccionada:</label>
+          <select id="sheetSelect" class="bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500" disabled>
+            <option>Sin hojas</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Indicadores de Estado -->
+      <div id="statusCounters" class="flex items-center gap-2 text-xs">
+        <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200" id="countTotal">Total: 0</span>
+        <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200" id="countValid">Correctos: 0</span>
+        <span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-semibold border border-rose-200" id="countInvalid">Requieren Corrección: 0</span>
+        <span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-semibold border border-amber-200" id="countPending">Pendientes: 0</span>
+      </div>
+    </div>
+
+    <!-- TABLA DE REGISTROS -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1">
+      
+      <!-- Toolbar -->
+      <div class="p-3 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="searchInput" placeholder="Buscar por CLEE, Razón, Calle E10..." class="pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg w-64 md:w-80 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+          <select id="filterDecision" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="all">Todos los registros</option>
+            <option value="CORRECTO">Solo Correctos</option>
+            <option value="CORREGIR">Solo Por Corregir</option>
+            <option value="PENDIENTE">Solo Pendientes</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-500" id="tableRecordInfo">0 establecimientos</span>
+        </div>
+      </div>
+
+      <!-- Tabla interactiva -->
+      <div class="overflow-x-auto custom-scroll flex-1 max-h-[580px]">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-100 text-slate-600 font-semibold sticky top-0 shadow-sm z-10">
+            <tr>
+              <th class="p-3 text-center w-28">¿Es Correcto?</th>
+              <th class="p-3 text-center w-20">Editar</th>
+              <th class="p-3 w-64">Observaciones / Motivo</th>
+              <th class="p-3">Datos del Establecimiento (RENEM / DENUE)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200" id="tableBody">
+            <tr>
+              <td colspan="4" class="text-center py-12 text-slate-400">
+                <i class="fa-solid fa-file-arrow-up text-4xl mb-3 text-slate-300 block"></i>
+                Carga el archivo <code>11572.xlsx</code> para auditar y modificar sus datos en vivo.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL PARA EDICIÓN DIRECTA EN EL EXCEL -->
+  <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 class="font-bold text-sm flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-emerald-400"></i> Inspeccionar y Modificar Datos en el Archivo
+        </h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white transition text-lg">&times;</button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto custom-scroll flex-1 space-y-4" id="modalContent">
+        <!-- Render dinámico -->
+      </div>
+
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+        <span class="text-xs text-slate-500 italic"><i class="fa-solid fa-circle-info mr-1"></i>Los cambios realizados aquí impactan directamente el archivo a descargar.</span>
+        <button onclick="closeModal()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-5 py-2 rounded-lg transition">
+          Listo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let rawWorkbook = null;
+    let currentSheetName = "";
+    let parsedRows = []; 
+    let auditDecisions = {}; // rIdx -> { status, notes }
+
+    const fileInput = document.getElementById('fileInput');
+    const sheetSelect = document.getElementById('sheetSelect');
+    const tableBody = document.getElementById('tableBody');
+    const currentFileName = document.getElementById('currentFileName');
+    const btnSaveModified = document.getElementById('btnSaveModified');
+    const searchInput = document.getElementById('searchInput');
+    const filterDecision = document.getElementById('filterDecision');
+
+    fileInput.addEventListener('change', handleFile);
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      currentFileName.innerText = file.name;
+      const reader = new FileReader();
+
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        rawWorkbook = XLSX.read(data, { type: 'array', cellDates: true, cellStyles: true });
+
+        sheetSelect.innerHTML = '';
+        rawWorkbook.SheetNames.forEach(sheet => {
+          const opt = document.createElement('option');
+          opt.value = sheet;
+          opt.textContent = sheet;
+          if (sheet.toLowerCase() === 'formato') opt.selected = true;
+          sheetSelect.appendChild(opt);
+        });
+
+        sheetSelect.disabled = false;
+        btnSaveModified.disabled = false;
+        loadSheet(sheetSelect.value);
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    sheetSelect.addEventListener('change', (e) => loadSheet(e.target.value));
+    searchInput.addEventListener('input', renderTable);
+    filterDecision.addEventListener('change', renderTable);
+
+    function loadSheet(sheetName) {
+      currentSheetName = sheetName;
+      const sheet = rawWorkbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+      if (!json || json.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-400">Hoja vacía.</td></tr>`;
+        return;
+      }
+
+      // Encontrar fila de encabezados
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(10, json.length); i++) {
+        const strRow = (json[i] || []).join(" ");
+        if (strRow.includes("CLEE") || strRow.includes("ID_EST") || strRow.includes("E08") || strRow.includes("E23")) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      const rawHeaders = json[headerRowIndex] || [];
+      const subHeaders = json[headerRowIndex + 1] || [];
+      const maxCols = Math.max(...json.map(r => r.length));
+
+      let colDefinitions = [];
+      for (let c = 0; c < maxCols; c++) {
+        let code = (rawHeaders[c] || "").toString().trim();
+        let desc = (subHeaders[c] || "").toString().trim();
+        let label = code || desc || `Col_${c}`;
+        label = label.replace(/\s+/g, ' ');
+        colDefinitions.push({ colIdx: c, code, desc, label });
+      }
+
+      let dataStart = headerRowIndex + 1;
+      if (json[dataStart] && (json[dataStart].join(" ").includes("Revise") || json[dataStart].join(" ").includes("ID_EMP"))) {
+        dataStart++;
+      }
+
+      parsedRows = [];
+      auditDecisions = {};
+
+      for (let r = dataStart; r < json.length; r++) {
+        const row = json[r];
+        if (!row || row.filter(x => x !== "").length === 0) continue;
+
+        let rowObj = { _rowIdx: r, _cells: {} };
+        colDefinitions.forEach(col => {
+          rowObj._cells[col.colIdx] = {
+            colIdx: col.colIdx,
+            code: col.code,
+            desc: col.desc,
+            label: col.label,
+            value: row[col.colIdx] !== undefined ? row[col.colIdx] : ""
+          };
+        });
+
+        parsedRows.push(rowObj);
+        auditDecisions[r] = { status: 'PENDIENTE', notes: '' };
+      }
+
+      renderTable();
+    }
+
+    function renderTable() {
+      const q = searchInput.value.toLowerCase().trim();
+      const decisionFilter = filterDecision.value;
+
+      const filtered = parsedRows.filter(row => {
+        const dec = auditDecisions[row._rowIdx];
+        if (decisionFilter !== 'all' && dec.status !== decisionFilter) return false;
+
+        if (!q) return true;
+        return Object.values(row._cells).some(c => String(c.value).toLowerCase().includes(q));
+      });
+
+      updateStats();
+      document.getElementById('tableRecordInfo').innerText = `${filtered.length} de ${parsedRows.length} establecimientos`;
+
+      if (filtered.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400">No se encontraron registros.</td></tr>`;
+        return;
+      }
+
+      tableBody.innerHTML = filtered.map(row => {
+        const rIdx = row._rowIdx;
+        const dec = auditDecisions[rIdx];
+
+        // Extracción precisa de los campos solicitados
+        const clee = getValByPattern(row, ['CLEE', 'ID_EST']) || 'N/A';
+        const nombre = getValByPattern(row, ['E08']) || getValByPattern(row, ['Nombre']) || 'Sin nombre';
+        const tipoUE = getValByPattern(row, ['E23']) || '';
+        
+        // E10 estricto (Nombre de vialidad, no Tipo_E10)
+        const vialidadE10 = getExactField(row, 'E10', 'Tipo_E10');
+        const numExt = getExactField(row, 'E11') || '';
+        
+        // Campos requeridos: Personal ocupado, Ingresos y G425B
+        const personalH001 = getExactField(row, 'H001') || getValByPattern(row, ['personal']);
+        const ingresosM000 = getExactField(row, 'M000') || getValByPattern(row, ['ingresos global']);
+        const afiliacionG425B = getExactField(row, 'G425B') || '';
+
+        const badgeClass = {
+          'CORRECTO': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+          'CORREGIR': 'bg-rose-100 text-rose-800 border-rose-300',
+          'PENDIENTE': 'bg-amber-100 text-amber-800 border-amber-300'
+        }[dec.status];
+
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100 ${dec.status === 'CORREGIR' ? 'bg-rose-50/20' : ''}">
+            <!-- Selección Decisión -->
+            <td class="p-3 align-top text-center">
+              <div class="inline-flex flex-col gap-1.5 items-center">
+                <span class="px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}">
+                  ${dec.status}
+                </span>
+                <div class="flex gap-1">
+                  <button onclick="setDecision(${rIdx}, 'CORRECTO')" title="Marcar Correcto" class="w-7 h-7 rounded bg-white hover:bg-emerald-50 text-emerald-600 border border-slate-200 hover:border-emerald-400 shadow-xs flex items-center justify-center transition">
+                    <i class="fa-solid fa-check"></i>
+                  </button>
+                  <button onclick="setDecision(${rIdx}, 'CORREGIR')" title="Marcar para Corregir" class="w-7 h-7 rounded bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-400 shadow-xs flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                  <button onclick="setDecision(${rIdx}, 'PENDIENTE')" title="Marcar Pendiente" class="w-7 h-7 rounded bg-white hover:bg-amber-50 text-amber-600 border border-slate-200 hover:border-amber-400 shadow-xs flex items-center justify-center transition">
+                    <i class="fa-solid fa-rotate-left"></i>
+                  </button>
+                </div>
+              </div>
+            </td>
+
+            <!-- Botón Editar / Inspeccionar -->
+            <td class="p-3 align-top text-center">
+              <button onclick="openModal(${rIdx})" class="text-xs bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 px-2.5 py-1.5 rounded-md font-medium border border-slate-200 transition flex items-center justify-center gap-1 mx-auto">
+                <i class="fa-solid fa-pen"></i> Editar
+              </button>
+            </td>
+
+            <!-- Observaciones -->
+            <td class="p-3 align-top">
+              <textarea 
+                onchange="updateNotes(${rIdx}, this.value)" 
+                placeholder="Indica qué dato está incorrecto o requiere subsanarse..." 
+                class="w-full text-xs p-2 border rounded-md border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none h-20 bg-white"
+              >${dec.notes}</textarea>
+            </td>
+
+            <!-- Ficha / Etiqueta con los campos solicitados -->
+            <td class="p-3 align-top space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-900 text-sm">${nombre}</span>
+                <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded text-[11px] font-semibold">${tipoUE || 'Establecimiento'}</span>
+                <span class="text-slate-400 text-xs">| CLEE: <code class="font-mono text-slate-700 font-semibold">${clee}</code></span>
+              </div>
+
+              <!-- Bloque con E10, Personal Ocupado, Ingresos y G425B -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500 block uppercase">Vialidad (E10):</span>
+                  <span class="font-medium text-slate-800">${vialidadE10 ? vialidadE10 + (numExt ? ' #' + numExt : '') : '<span class="text-slate-400 italic">No especificada</span>'}</span>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500 block uppercase">Personal Ocupado:</span>
+                  <span class="font-semibold ${personalH001 ? 'text-emerald-700' : 'text-slate-400 italic'}">
+                    ${personalH001 ? personalH001 + ' personas' : 'Sin desglose'}
+                  </span>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500 block uppercase">Ingresos (Miles $):</span>
+                  <span class="font-semibold ${ingresosM000 ? 'text-blue-700' : 'text-slate-400 italic'}">
+                    ${ingresosM000 ? '$' + Number(ingresosM000).toLocaleString() : 'N/A (Sólo Matriz)'}
+                  </span>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500 block uppercase">Cámara / Asoc. (G425B):</span>
+                  <span class="font-medium text-slate-800">${afiliacionG425B || '<span class="text-slate-400 italic">Ninguna</span>'}</span>
+                </div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Funciones de búsqueda exacta de campos
+    function getExactField(row, codeMatch, excludePrefix = null) {
+      for (let colIdx in row._cells) {
+        const cell = row._cells[colIdx];
+        const c = (cell.code || "").trim();
+        if (excludePrefix && c.startsWith(excludePrefix)) continue;
+        if (c.startsWith(codeMatch)) {
+          return cell.value;
+        }
+      }
+      return "";
+    }
+
+    function getValByPattern(row, terms) {
+      for (let colIdx in row._cells) {
+        const cell = row._cells[colIdx];
+        const full = (cell.code + " " + cell.desc).toLowerCase();
+        if (terms.some(t => full.includes(t.toLowerCase())) && cell.value !== "") {
+          return cell.value;
+        }
+      }
+      return "";
+    }
+
+    function setDecision(rowIndex, status) {
+      auditDecisions[rowIndex].status = status;
+      renderTable();
+    }
+
+    function updateNotes(rowIndex, val) {
+      auditDecisions[rowIndex].notes = val;
+      updateStats();
+    }
+
+    function updateStats() {
+      const decs = Object.values(auditDecisions);
+      const total = decs.length;
+      const valid = decs.filter(d => d.status === 'CORRECTO').length;
+      const invalid = decs.filter(d => d.status === 'CORREGIR').length;
+      const pending = decs.filter(d => d.status === 'PENDIENTE').length;
+
+      document.getElementById('countTotal').innerText = `Total: ${total}`;
+      document.getElementById('countValid').innerText = `Correctos: ${valid}`;
+      document.getElementById('countInvalid').innerText = `Por Corregir: ${invalid}`;
+      document.getElementById('countPending').innerText = `Pendientes: ${pending}`;
+    }
+
+    // MODAL DE EDICIÓN EN CALIENTE
+    function openModal(rowIndex) {
+      const item = parsedRows.find(r => r._rowIdx === rowIndex);
+      if (!item) return;
+
+      const modal = document.getElementById('detailModal');
+      const content = document.getElementById('modalContent');
+      const dec = auditDecisions[rowIndex];
+
+      let fieldsHtml = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+      for (const [colIdx, cell] of Object.entries(item._cells)) {
+        // Filtrar columnas completamente vacías de cabecera
+        if (!cell.code && !cell.desc) continue;
+
+        fieldsHtml += `
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 font-semibold mb-1">
+                <span class="text-blue-600 font-bold">${cell.code || 'Campo'}</span>
+                <span class="text-[10px] text-slate-400">Col ${Number(colIdx)+1}</span>
+              </div>
+              <div class="text-[11px] text-slate-600 line-clamp-1 mb-1.5" title="${cell.desc}">${cell.desc || cell.label}</div>
+            </div>
+            <input 
+              type="text" 
+              value="${cell.value !== undefined ? cell.value : ''}" 
+              onchange="onCellValueChange(${rowIndex}, ${colIdx}, this.value)"
+              class="w-full text-xs p-1.5 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-800"
+            />
+          </div>
+        `;
+      }
+      fieldsHtml += '</div>';
+
+      content.innerHTML = `
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-semibold text-blue-900">Estatus de Auditoría:</span>
+            <span class="ml-2 font-bold text-xs px-2 py-0.5 rounded bg-white border border-blue-300 text-blue-800">${dec.status}</span>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="setDecision(${rowIndex}, 'CORRECTO'); openModal(${rowIndex})" class="px-3 py-1 bg-emerald-600 text-white text-xs font-bold rounded hover:bg-emerald-500">Marcar Correcto</button>
+            <button onclick="setDecision(${rowIndex}, 'CORREGIR'); openModal(${rowIndex})" class="px-3 py-1 bg-rose-600 text-white text-xs font-bold rounded hover:bg-rose-500">Marcar Corregir</button>
+          </div>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Edición de Celdas del Registro (Fila Excel: ${rowIndex + 1})</h4>
+          ${fieldsHtml}
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+    }
+
+    // MODIFICAR CELDA DIRECTAMENTE EN EL OBJETO WORKBOOK
+    function onCellValueChange(rowIndex, colIndex, newValue) {
+      // 1. Actualizar el estado en memoria de la UI
+      const item = parsedRows.find(r => r._rowIdx === rowIndex);
+      if (item && item._cells[colIndex]) {
+        item._cells[colIndex].value = newValue;
+      }
+
+      // 2. Modificar la celda exacta en el Workbook de SheetJS
+      if (rawWorkbook && currentSheetName) {
+        const sheet = rawWorkbook.Sheets[currentSheetName];
+        const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+
+        if (!sheet[cellAddress]) {
+          sheet[cellAddress] = { t: 's', v: newValue };
+        } else {
+          // Detectar si es numérico
+          if (!isNaN(newValue) && newValue.trim() !== "") {
+            sheet[cellAddress].t = 'n';
+            sheet[cellAddress].v = Number(newValue);
+          } else {
+            sheet[cellAddress].t = 's';
+            sheet[cellAddress].v = newValue;
+          }
+        }
+      }
+
+      renderTable();
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+    }
+
+    // DESCARGAR ARCHIVO EXCEL MODIFICADO
+    btnSaveModified.addEventListener('click', () => {
+      if (!rawWorkbook) return;
+
+      // Inyectar en una hoja adicional el resultado de la auditoría para trazabilidad
+      const auditSummary = parsedRows.map(row => {
+        const dec = auditDecisions[row._rowIdx];
+        const clee = getValByPattern(row, ['CLEE', 'ID_EST']);
+        const e08 = getValByPattern(row, ['E08']);
+        return {
+          'Fila': row._rowIdx + 1,
+          'CLEE': clee,
+          'Nombre': e08,
+          'Estatus_Auditoria': dec.status,
+          'Observaciones': dec.notes
+        };
+      });
+
+      const auditSheet = XLSX.utils.json_to_sheet(auditSummary);
+      // Si ya existía la hoja 'Auditoria_Revision', la reemplazamos
+      if (rawWorkbook.Sheets['Auditoria_Revision']) {
+        rawWorkbook.Sheets['Auditoria_Revision'] = auditSheet;
+      } else {
+        XLSX.utils.book_append_sheet(rawWorkbook, auditSheet, "Auditoria_Revision");
+      }
+
+      const origName = currentFileName.innerText.replace(/\.[^/.]+$/, "");
+      XLSX.writeFile(rawWorkbook, `${origName}_Modificado.xlsx`);
+    });
+  </script>
+</body>
+</html>
