@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FACE / Conformación de Empresas INEGI 2026</title>
+  <title>Verificador y Editor RENEM / INEGI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS para lectura, modificación en caliente y escritura de Excel -->
+  <!-- SheetJS para lectura, modificación en caliente y exportación -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -25,12 +25,12 @@
           <i class="fa-solid fa-file-pen text-xl"></i>
         </div>
         <div>
-          <h1 class="text-lg font-bold leading-tight">Auditor de FACE / Conformación de Empresas INEGI 2026</h1>
+          <h1 class="text-lg font-bold leading-tight">Auditor y Editor RENEM / DENUE</h1>
           <p class="text-xs text-slate-400">Verificación, validación y edición directa del archivo Excel</p>
         </div>
       </div>
 
-      <!-- Quick Actions -->
+      <!-- Acciones de Cabecera -->
       <div class="flex items-center gap-2">
         <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow flex items-center gap-2">
           <i class="fa-solid fa-folder-open"></i> Subir Archivo (.xlsx)
@@ -43,7 +43,7 @@
     </div>
   </header>
 
-  <!-- CONTENEDOR PRINCIPAL -->
+  <!-- CONTENIDO PRINCIPAL -->
   <main class="max-w-7xl mx-auto w-full px-4 py-6 flex-1 flex flex-col gap-4">
     
     <!-- BARRA DE INFORMACIÓN Y FILTROS -->
@@ -109,7 +109,7 @@
             <tr>
               <td colspan="4" class="text-center py-12 text-slate-400">
                 <i class="fa-solid fa-file-arrow-up text-4xl mb-3 text-slate-300 block"></i>
-                Carga el archivo <code>11572.xlsx</code> para auditar y modificar sus datos en vivo.
+                Carga el archivo <code>11572.xlsx</code> para auditar y verificar sus datos.
               </td>
             </tr>
           </tbody>
@@ -118,7 +118,7 @@
     </div>
   </main>
 
-  <!-- MODAL PARA EDICIÓN DIRECTA EN EL EXCEL -->
+  <!-- MODAL DE INSPECCIÓN Y EDICIÓN -->
   <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
       <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
@@ -133,7 +133,7 @@
       </div>
 
       <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
-        <span class="text-xs text-slate-500 italic"><i class="fa-solid fa-circle-info mr-1"></i>Los cambios realizados aquí impactan directamente el archivo a descargar.</span>
+        <span class="text-xs text-slate-500 italic"><i class="fa-solid fa-circle-info mr-1"></i>Campos de fecha vacíos se conservan vacíos sin alterar el archivo.</span>
         <button onclick="closeModal()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-5 py-2 rounded-lg transition">
           Listo
         </button>
@@ -145,7 +145,7 @@
     let rawWorkbook = null;
     let currentSheetName = "";
     let parsedRows = []; 
-    let auditDecisions = {}; // rIdx -> { status, notes }
+    let auditDecisions = {};
 
     const fileInput = document.getElementById('fileInput');
     const sheetSelect = document.getElementById('sheetSelect');
@@ -157,6 +157,25 @@
 
     fileInput.addEventListener('change', handleFile);
 
+    function isDateField(code, desc) {
+      const full = (code + " " + desc).toLowerCase();
+      return full.includes('fecha') || full.includes('dd/mm/aaaa') || full.includes('_f') || full.includes('c154');
+    }
+
+    function cleanValue(val, isDate = false) {
+      if (val === undefined || val === null) return "";
+      const s = String(val).trim();
+      if (s === "" || s.toLowerCase() === "nan" || s.toLowerCase() === "null" || s.toLowerCase() === "undefined") {
+        return "";
+      }
+      if (isDate) {
+        if (s.includes("1899-12-30") || s.toLowerCase().includes("invalid")) {
+          return "";
+        }
+      }
+      return val;
+    }
+
     function handleFile(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -166,7 +185,7 @@
 
       reader.onload = function(evt) {
         const data = new Uint8Array(evt.target.result);
-        rawWorkbook = XLSX.read(data, { type: 'array', cellDates: true, cellStyles: true });
+        rawWorkbook = XLSX.read(data, { type: 'array', cellDates: false, raw: true });
 
         sheetSelect.innerHTML = '';
         rawWorkbook.SheetNames.forEach(sheet => {
@@ -199,7 +218,6 @@
         return;
       }
 
-      // Encontrar fila de encabezados
       let headerRowIndex = 0;
       for (let i = 0; i < Math.min(10, json.length); i++) {
         const strRow = (json[i] || []).join(" ");
@@ -217,9 +235,9 @@
       for (let c = 0; c < maxCols; c++) {
         let code = (rawHeaders[c] || "").toString().trim();
         let desc = (subHeaders[c] || "").toString().trim();
-        let label = code || desc || `Col_${c}`;
-        label = label.replace(/\s+/g, ' ');
-        colDefinitions.push({ colIdx: c, code, desc, label });
+        let label = (code || desc || `Col_${c}`).replace(/\s+/g, ' ');
+        const dateType = isDateField(code, desc);
+        colDefinitions.push({ colIdx: c, code, desc, label, isDate: dateType });
       }
 
       let dataStart = headerRowIndex + 1;
@@ -236,12 +254,16 @@
 
         let rowObj = { _rowIdx: r, _cells: {} };
         colDefinitions.forEach(col => {
+          let rawVal = row[col.colIdx];
+          let cleaned = cleanValue(rawVal, col.isDate);
+
           rowObj._cells[col.colIdx] = {
             colIdx: col.colIdx,
             code: col.code,
             desc: col.desc,
             label: col.label,
-            value: row[col.colIdx] !== undefined ? row[col.colIdx] : ""
+            isDate: col.isDate,
+            value: cleaned
           };
         });
 
@@ -276,7 +298,6 @@
         const rIdx = row._rowIdx;
         const dec = auditDecisions[rIdx];
 
-        // Extracción precisa de los campos solicitados
         const clee = getValByPattern(row, ['CLEE', 'ID_EST']) || 'N/A';
         const nombre = getValByPattern(row, ['E08']) || getValByPattern(row, ['Nombre']) || 'Sin nombre';
         const tipoUE = getValByPattern(row, ['E23']) || '';
@@ -285,7 +306,7 @@
         const vialidadE10 = getExactField(row, 'E10', 'Tipo_E10');
         const numExt = getExactField(row, 'E11') || '';
         
-        // Campos requeridos: Personal ocupado, Ingresos y G425B
+        // Personal, Ingresos y G425B
         const personalH001 = getExactField(row, 'H001') || getValByPattern(row, ['personal']);
         const ingresosM000 = getExactField(row, 'M000') || getValByPattern(row, ['ingresos global']);
         const afiliacionG425B = getExactField(row, 'G425B') || '';
@@ -298,7 +319,6 @@
 
         return `
           <tr class="hover:bg-slate-50 transition border-b border-slate-100 ${dec.status === 'CORREGIR' ? 'bg-rose-50/20' : ''}">
-            <!-- Selección Decisión -->
             <td class="p-3 align-top text-center">
               <div class="inline-flex flex-col gap-1.5 items-center">
                 <span class="px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}">
@@ -318,23 +338,20 @@
               </div>
             </td>
 
-            <!-- Botón Editar / Inspeccionar -->
             <td class="p-3 align-top text-center">
               <button onclick="openModal(${rIdx})" class="text-xs bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 px-2.5 py-1.5 rounded-md font-medium border border-slate-200 transition flex items-center justify-center gap-1 mx-auto">
                 <i class="fa-solid fa-pen"></i> Editar
               </button>
             </td>
 
-            <!-- Observaciones -->
             <td class="p-3 align-top">
               <textarea 
                 onchange="updateNotes(${rIdx}, this.value)" 
-                placeholder="Indica qué dato está incorrecto o requiere subsanarse..." 
+                placeholder="Observaciones de validación..." 
                 class="w-full text-xs p-2 border rounded-md border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none h-20 bg-white"
               >${dec.notes}</textarea>
             </td>
 
-            <!-- Ficha / Etiqueta con los campos solicitados -->
             <td class="p-3 align-top space-y-2">
               <div class="flex items-center gap-2">
                 <span class="font-bold text-slate-900 text-sm">${nombre}</span>
@@ -342,7 +359,7 @@
                 <span class="text-slate-400 text-xs">| CLEE: <code class="font-mono text-slate-700 font-semibold">${clee}</code></span>
               </div>
 
-              <!-- Bloque con E10, Personal Ocupado, Ingresos y G425B -->
+              <!-- Ficha con E10, Personal Ocupado, Ingresos y G425B -->
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                 <div>
                   <span class="text-[10px] font-bold text-slate-500 block uppercase">Vialidad (E10):</span>
@@ -371,7 +388,6 @@
       }).join('');
     }
 
-    // Funciones de búsqueda exacta de campos
     function getExactField(row, codeMatch, excludePrefix = null) {
       for (let colIdx in row._cells) {
         const cell = row._cells[colIdx];
@@ -418,7 +434,7 @@
       document.getElementById('countPending').innerText = `Pendientes: ${pending}`;
     }
 
-    // MODAL DE EDICIÓN EN CALIENTE
+    // MODAL DE DETALLE Y EDICIÓN
     function openModal(rowIndex) {
       const item = parsedRows.find(r => r._rowIdx === rowIndex);
       if (!item) return;
@@ -429,20 +445,24 @@
 
       let fieldsHtml = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
       for (const [colIdx, cell] of Object.entries(item._cells)) {
-        // Filtrar columnas completamente vacías de cabecera
         if (!cell.code && !cell.desc) continue;
 
+        const isDate = cell.isDate;
+        const placeholderText = isDate ? "dd/mm/aaaa (dejar vacío si no aplica)" : "Vacío";
+
         fieldsHtml += `
-          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between">
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between ${isDate ? 'border-amber-200/70 bg-amber-50/20' : ''}">
             <div>
               <div class="flex items-center justify-between text-[11px] text-slate-500 font-semibold mb-1">
                 <span class="text-blue-600 font-bold">${cell.code || 'Campo'}</span>
+                ${isDate ? '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-medium">Fecha</span>' : ''}
                 <span class="text-[10px] text-slate-400">Col ${Number(colIdx)+1}</span>
               </div>
               <div class="text-[11px] text-slate-600 line-clamp-1 mb-1.5" title="${cell.desc}">${cell.desc || cell.label}</div>
             </div>
             <input 
               type="text" 
+              placeholder="${placeholderText}"
               value="${cell.value !== undefined ? cell.value : ''}" 
               onchange="onCellValueChange(${rowIndex}, ${colIdx}, this.value)"
               class="w-full text-xs p-1.5 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-800"
@@ -464,7 +484,7 @@
           </div>
         </div>
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Edición de Celdas del Registro (Fila Excel: ${rowIndex + 1})</h4>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Edición de Celdas (Fila Excel: ${rowIndex + 1})</h4>
           ${fieldsHtml}
         </div>
       `;
@@ -472,29 +492,29 @@
       modal.classList.remove('hidden');
     }
 
-    // MODIFICAR CELDA DIRECTAMENTE EN EL OBJETO WORKBOOK
-    function onCellValueChange(rowIndex, colIndex, newValue) {
-      // 1. Actualizar el estado en memoria de la UI
+    // MODIFICAR VALOR O ELIMINAR SI ESTÁ VACÍO
+    function onCellValueChange(rowIndex, colIndex, rawVal) {
       const item = parsedRows.find(r => r._rowIdx === rowIndex);
-      if (item && item._cells[colIndex]) {
-        item._cells[colIndex].value = newValue;
-      }
+      if (!item) return;
 
-      // 2. Modificar la celda exacta en el Workbook de SheetJS
+      const cellMeta = item._cells[colIndex];
+      const cleaned = cleanValue(rawVal, cellMeta.isDate);
+      cellMeta.value = cleaned;
+
       if (rawWorkbook && currentSheetName) {
         const sheet = rawWorkbook.Sheets[currentSheetName];
         const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
 
-        if (!sheet[cellAddress]) {
-          sheet[cellAddress] = { t: 's', v: newValue };
+        // REGLA CLAVE: Si queda vacío, se retira la celda para que quede vacía en el Excel
+        if (cleaned === "") {
+          if (sheet[cellAddress]) {
+            delete sheet[cellAddress];
+          }
         } else {
-          // Detectar si es numérico
-          if (!isNaN(newValue) && newValue.trim() !== "") {
-            sheet[cellAddress].t = 'n';
-            sheet[cellAddress].v = Number(newValue);
+          if (!isNaN(cleaned) && !cellMeta.isDate) {
+            sheet[cellAddress] = { t: 'n', v: Number(cleaned) };
           } else {
-            sheet[cellAddress].t = 's';
-            sheet[cellAddress].v = newValue;
+            sheet[cellAddress] = { t: 's', v: String(cleaned).trim() };
           }
         }
       }
@@ -506,11 +526,10 @@
       document.getElementById('detailModal').classList.add('hidden');
     }
 
-    // DESCARGAR ARCHIVO EXCEL MODIFICADO
+    // EXPORTAR EXCEL MODIFICADO
     btnSaveModified.addEventListener('click', () => {
       if (!rawWorkbook) return;
 
-      // Inyectar en una hoja adicional el resultado de la auditoría para trazabilidad
       const auditSummary = parsedRows.map(row => {
         const dec = auditDecisions[row._rowIdx];
         const clee = getValByPattern(row, ['CLEE', 'ID_EST']);
@@ -525,7 +544,6 @@
       });
 
       const auditSheet = XLSX.utils.json_to_sheet(auditSummary);
-      // Si ya existía la hoja 'Auditoria_Revision', la reemplazamos
       if (rawWorkbook.Sheets['Auditoria_Revision']) {
         rawWorkbook.Sheets['Auditoria_Revision'] = auditSheet;
       } else {
