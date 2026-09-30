@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verificador RENEM / DENUE - Reglas de Validación Oficiales</title>
+  <title>Auditor RENEM / DENUE - Reglas Oficiales y Criterios Técnicos</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS para lectura y análisis de hojas de cálculo -->
+  <!-- SheetJS para lectura y procesamiento de archivos Excel -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -22,11 +22,11 @@
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow">
-          <i class="fa-solid fa-clipboard-check text-xl"></i>
+          <i class="fa-solid fa-shield-halved text-xl"></i>
         </div>
         <div>
-          <h1 class="text-lg font-bold leading-tight">Verificador de Conformación de Empresas RENEM</h1>
-          <p class="text-xs text-slate-400">Validación técnica conforme a FD Oficial INEGI (Solo Lectura y Auditoría)</p>
+          <h1 class="text-lg font-bold leading-tight">Auditor RENEM / DENUE 2026</h1>
+          <p class="text-xs text-slate-400">Validación Técnica de Congruencias (Solo Lectura - FD y Criterios RENEM)</p>
         </div>
       </div>
 
@@ -44,7 +44,7 @@
   </header>
 
   <!-- CONTENIDO PRINCIPAL -->
-  <main class="max-w-7xl mx-auto w-full px-4 py-6 flex-1 flex flex-col gap-4">
+  <main class="max-w-7xl mx-auto w-full px-4 py-5 flex-1 flex flex-col gap-4">
     
     <!-- BARRA DE INFORMACIÓN Y FILTROS -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4">
@@ -65,8 +65,8 @@
       <!-- Contadores de Estado y Validaciones -->
       <div class="flex flex-wrap items-center gap-2 text-xs">
         <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200" id="countTotal">Total: 0</span>
-        <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-semibold border border-rose-300" id="countErrors">Con Inconsistencias FD: 0</span>
-        <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200" id="countValid">Marcados Correctos: 0</span>
+        <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-semibold border border-rose-300" id="countErrors">Con Inconsistencias: 0</span>
+        <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200" id="countValid">Validados Correctos: 0</span>
         <span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-semibold border border-rose-200" id="countCorregir">Por Corregir: 0</span>
       </div>
     </div>
@@ -83,10 +83,10 @@
           </div>
           <select id="filterDecision" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
             <option value="all">Todos los registros</option>
-            <option value="with_errors">⚠️ Con Errores de Validación</option>
-            <option value="CORRECTO">Decisión: Correcto</option>
-            <option value="CORREGIR">Decisión: Requiere Corrección</option>
-            <option value="PENDIENTE">Decisión: Pendiente</option>
+            <option value="with_errors">⚠️ Solo con Inconsistencias</option>
+            <option value="CORRECTO">Dictamen: Correcto</option>
+            <option value="CORREGIR">Dictamen: Requiere Corrección</option>
+            <option value="PENDIENTE">Dictamen: Pendiente</option>
           </select>
         </div>
 
@@ -102,7 +102,7 @@
             <tr>
               <th class="p-3 text-center w-28">Dictamen</th>
               <th class="p-3 text-center w-20">Detalle</th>
-              <th class="p-3 w-64">Observaciones de Auditoría</th>
+              <th class="p-3 w-64">Observaciones del Auditor</th>
               <th class="p-3">Datos del Establecimiento (RENEM / DENUE)</th>
             </tr>
           </thead>
@@ -110,7 +110,7 @@
             <tr>
               <td colspan="4" class="text-center py-12 text-slate-400">
                 <i class="fa-solid fa-file-shield text-4xl mb-3 text-slate-300 block"></i>
-                Carga el archivo <code>11572.xlsx</code> para auditar con las validaciones del FD oficial.
+                Carga un archivo (e.g. <code>11572.xlsx</code>) para auditar con los criterios de validación.
               </td>
             </tr>
           </tbody>
@@ -142,96 +142,13 @@
   </div>
 
   <script>
-    // MOTOR DE REGLAS BASADO EN EL FD OFICIAL DEL RENEM
-    const FD_RULES = {
-      'E23': {
-        desc: 'Forma de organización',
-        type: 'cat',
-        validate: (val) => {
-          if (!val) return null;
-          const v = String(val).trim().toUpperCase();
-          const valid = ['M', 'S', 'MATRIZ', 'SUCURSAL', '1', '2'];
-          return valid.includes(v) ? null : 'Debe ser Matriz (M) o Sucursal (S)';
-        }
-      },
-      'G111A': {
-        desc: 'Año de inicio de operaciones',
-        type: 'num',
-        validate: (val) => {
-          if (!val) return null; // Puede estar vacío si no es alta o cambio
-          const yr = parseInt(val, 10);
-          if (isNaN(yr) || yr < 1900 || yr > 2026) {
-            return `Año fuera de rango válido (1900 - 2026): "${val}"`;
-          }
-          return null;
-        }
-      },
-      'E14A': {
-        desc: 'Código Postal',
-        type: 'cp',
-        validate: (val) => {
-          if (!val) return null;
-          const s = String(val).trim();
-          if (!/^\d{5}$/.test(s)) {
-            return `Código postal inválido, debe ser de 5 dígitos: "${val}"`;
-          }
-          const num = parseInt(s, 10);
-          if (num < 1000 || num > 99999) {
-            return `Código postal fuera del rango nacional (01000 - 99999): "${val}"`;
-          }
-          return null;
-        }
-      },
-      'RFC': {
-        desc: 'RFC de la empresa',
-        type: 'rfc',
-        validate: (val) => {
-          if (!val) return null; // Si está vacío es válido
-          const s = String(val).trim().toUpperCase();
-          // Persona moral (12) o física (13)
-          if (!/^[A-Z&Ñ]{3,4}\d{6}[A-V1-9][A-Z0-9][0-9A]$/.test(s)) {
-            return `Estructura de RFC inválida: "${val}"`;
-          }
-          return null;
-        }
-      },
-      'IMSS': {
-        desc: 'Registro IMSS',
-        type: 'num',
-        validate: (val) => {
-          if (!val) return null;
-          const s = String(val).trim().replace(/-/g, '');
-          if (!/^\d{1,11}$/.test(s)) {
-            return `Registro patronal IMSS debe ser numérico de hasta 11 dígitos: "${val}"`;
-          }
-          return null;
-        }
-      },
-      'G425A': {
-        desc: 'Afiliación a Cámara (Sí/No)',
-        type: 'cat',
-        validate: (val) => {
-          if (!val) return null;
-          const v = String(val).trim().toUpperCase();
-          const valid = ['1', '2', 'SI', 'SÍ', 'NO'];
-          return valid.includes(v) ? null : `Valor inválido en afiliación a cámara: "${val}"`;
-        }
-      }
-    };
-
-    // Validación genérica para fechas: si viene vacía no marcar error; si trae dato debe ser fecha válida
-    function validateDateField(code, val) {
-      if (!val || String(val).trim() === "" || String(val).toLowerCase() === "nan") {
-        return null; // Válido en blanco
-      }
-      const s = String(val).trim();
-      // Acepta dd/mm/aaaa, dd-mm-aaaa, aaaa-mm-dd
-      const isDatePattern = /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$\vert{}^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(s);
-      if (!isDatePattern && isNaN(Date.parse(s))) {
-        return `Formato de fecha inválido (debe ser dd/mm/aaaa o estar vacío): "${val}"`;
-      }
-      return null;
-    }
+    const VIALIDADES_CATALOGO = [
+      "AMPLIACIÓN", "ANDADOR", "AVENIDA", "BOULEVARD", "CALLE", "CALLEJÓN",
+      "CALZADA", "CARRETERA", "CERRADA", "CIRCUITO", "CIRCUNVALACIÓN",
+      "CONTINUACIÓN", "CORREDOR", "DIAGONAL", "EJE VIAL", "PASAJE",
+      "PEATONAL", "PERIFÉRICO", "PRIVADA", "PROLONGACIÓN", "RETORNO",
+      "VIADUCTO", "AUTOPISTA"
+    ];
 
     let rawWorkbook = null;
     let currentSheetName = "";
@@ -247,6 +164,74 @@
     const filterDecision = document.getElementById('filterDecision');
 
     fileInput.addEventListener('change', handleFile);
+
+    function isDateVariable(code, desc) {
+      const full = (code + " " + desc).toLowerCase();
+      return full.includes('fecha') || full.includes('dd/mm/aaaa') || full.includes('_f') || full.includes('c154');
+    }
+
+    function cleanValue(val, isDate = false) {
+      if (val === undefined || val === null) return "";
+      const s = String(val).trim();
+      if (s === "" || s.toLowerCase() === "nan" || s.toLowerCase() === "null" || s.toLowerCase() === "undefined") {
+        return "";
+      }
+      if (isDate && (s.includes("1899-12-30") || s.toLowerCase().includes("invalid"))) {
+        return "";
+      }
+      return s;
+    }
+
+    // RESOLUCIÓN DE CÓDIGO CANÓNICO CON PRIORIDAD ESTRICTA A LA CABECERA PRINCIPAL (H1)
+    function identifyCanonicalCode(h1, h2) {
+      const cleanH1 = (h1 || "").trim();
+      const firstWordH1 = cleanH1.split(/[\s\n\r]/)[0].trim().toUpperCase();
+
+      // Lista de tokens exactos de variables oficiales
+      const knownTokens = [
+        'C612A', 'TUE_C', 'G111A', 'E23', 'CLEE', 'ID_EST', 'ID_EMP', 'ID_GRUPO',
+        'E08_P', 'E08_F', 'E08', 'E09_P', 'E09_F', 'E09ZF', 'E09Z', 'E09R', 'E09',
+        'Tipo_E10_A', 'Tipo_E10_B', 'Tipo_E10_C', 'Tipo_E10',
+        'E10_A', 'E10_B', 'E10_C', 'E10',
+        'E11A', 'E11', 'Tipo_E12P', 'E12', 'E13A', 'E13',
+        'E14A', 'Tipo_E14', 'E14', 'Tipo_E19', 'E19', 'E20', 'E16',
+        'E15F_PUB', 'E15F', 'E15C_PUB', 'E15C', 'E21_PUB', 'E21', 'E22', 'E25', 'E26', 'E27', 'E29',
+        'G425A', 'G425B', 'E17D', 'G142F', 'G142', 'E17ZA', 'E17_V',
+        'F116', 'F312', 'F313', 'F118', 'F120', 'F201', 'F113', 'F111', 'F110', 'F101', 'F112',
+        'F212_1A', 'F212_1B', 'F212_2A', 'F212_2B', 'F212_3A', 'F212_3B',
+        'H001', 'M000', 'RFC', 'CFE', 'IMSS', 'C611'
+      ];
+
+      // 1. Si la primera palabra de H1 es un token exacto conocido (ej. 'C612A', 'TUE_C', 'E08')
+      for (let t of knownTokens) {
+        if (firstWordH1 === t.toUpperCase()) {
+          return t;
+        }
+      }
+
+      // 2. Si no, checar la primera línea/palabra de H2 (subcabecera)
+      const cleanH2 = (h2 || "").trim();
+      const firstWordH2 = cleanH2.split(/[\s\n\r]/)[0].trim().toUpperCase();
+      for (let t of knownTokens) {
+        if (firstWordH2 === t.toUpperCase()) {
+          return t;
+        }
+      }
+
+      // 3. Búsqueda por regex de palabras completas (\bTOKEN\b) en H1 primero
+      for (let t of knownTokens) {
+        const re = new RegExp(`\\b${t}\\b`, 'i');
+        if (re.test(cleanH1)) return t;
+      }
+
+      // 4. Búsqueda por regex en H2 solo si no se encontró en H1
+      for (let t of knownTokens) {
+        const re = new RegExp(`\\b${t}\\b`, 'i');
+        if (re.test(cleanH2)) return t;
+      }
+
+      return firstWordH1 || firstWordH2 || "";
+    }
 
     function handleFile(e) {
       const file = e.target.files[0];
@@ -280,23 +265,6 @@
     searchInput.addEventListener('input', renderTable);
     filterDecision.addEventListener('change', renderTable);
 
-    function isDateVariable(code, desc) {
-      const full = (code + " " + desc).toLowerCase();
-      return full.includes('fecha') || full.includes('dd/mm/aaaa') || full.includes('_f') || full.includes('c154');
-    }
-
-    function cleanValue(val, isDate = false) {
-      if (val === undefined || val === null) return "";
-      const s = String(val).trim();
-      if (s === "" || s.toLowerCase() === "nan" || s.toLowerCase() === "null" || s.toLowerCase() === "undefined") {
-        return "";
-      }
-      if (isDate && (s.includes("1899-12-30") || s.toLowerCase().includes("invalid"))) {
-        return "";
-      }
-      return val;
-    }
-
     function loadSheet(sheetName) {
       currentSheetName = sheetName;
       const sheet = rawWorkbook.Sheets[sheetName];
@@ -307,7 +275,6 @@
         return;
       }
 
-      // Encontrar fila de encabezados
       let headerRowIndex = 0;
       for (let i = 0; i < Math.min(10, json.length); i++) {
         const strRow = (json[i] || []).join(" ");
@@ -323,11 +290,20 @@
 
       let colDefinitions = [];
       for (let c = 0; c < maxCols; c++) {
-        let code = (rawHeaders[c] || "").toString().trim();
-        let desc = (subHeaders[c] || "").toString().trim();
-        let label = (code || desc || `Col_${c}`).replace(/\s+/g, ' ');
-        const dateType = isDateVariable(code, desc);
-        colDefinitions.push({ colIdx: c, code, desc, label, isDate: dateType });
+        let h1 = (rawHeaders[c] || "").toString().trim();
+        let h2 = (subHeaders[c] || "").toString().trim();
+        let canonicalCode = identifyCanonicalCode(h1, h2);
+        let label = (canonicalCode || h1 || h2 || `Col_${c+1}`).replace(/\s+/g, ' ');
+        const dateType = isDateVariable(h1, h2);
+
+        colDefinitions.push({
+          colIdx: c,
+          canonicalCode: canonicalCode,
+          code: h1,
+          desc: h2,
+          label: label,
+          isDate: dateType
+        });
       }
 
       let dataStart = headerRowIndex + 1;
@@ -348,48 +324,293 @@
           let rawVal = row[col.colIdx];
           let cleaned = cleanValue(rawVal, col.isDate);
 
-          // Evaluar Validación según el FD
-          let validationError = null;
-
-          // Regla por variable exacta (E23, G111A, E14A, etc.)
-          const cleanCode = col.code.replace(/[\n\r]/g, ' ').split(' ')[0].trim();
-          if (FD_RULES[cleanCode]) {
-            validationError = FD_RULES[cleanCode].validate(cleaned);
-          } else if (col.isDate) {
-            validationError = validateDateField(col.code, cleaned);
-          }
-
-          if (validationError) {
-            rowObj._errors.push({
-              colIdx: col.colIdx,
-              code: cleanCode || col.label,
-              error: validationError,
-              value: cleaned
-            });
-          }
-
           rowObj._cells[col.colIdx] = {
             colIdx: col.colIdx,
-            code: cleanCode || col.code,
+            canonicalCode: col.canonicalCode,
+            code: col.code,
             desc: col.desc,
             label: col.label,
             isDate: col.isDate,
             value: cleaned,
-            error: validationError
+            error: null
           };
         });
 
+        // EVALUACIÓN DE CRITERIOS RENEM
+        evaluateActRenemRules(rowObj);
+
         parsedRows.push(rowObj);
-        // Si tiene errores, sugerir estatus CORREGIR automáticamente
+
         const defaultStatus = rowObj._errors.length > 0 ? 'CORREGIR' : 'PENDIENTE';
         const defaultNotes = rowObj._errors.length > 0 
-          ? `Inconsistencias detectadas en: ${rowObj._errors.map(e => e.code + ' (' + e.error + ')').join('; ')}`
+          ? `Inconsistencias detectadas: ${rowObj._errors.map(e => e.code + ': ' + e.error).join('; ')}`
           : '';
 
         auditDecisions[r] = { status: defaultStatus, notes: defaultNotes };
       }
 
       renderTable();
+    }
+
+    function evaluateActRenemRules(rowObj) {
+      function getByCanonical(code) {
+        for (let colIdx in rowObj._cells) {
+          const cell = rowObj._cells[colIdx];
+          if (cell.canonicalCode === code) return cell;
+        }
+        return null;
+      }
+
+      function addErr(cell, msg) {
+        if (!cell) return;
+        cell.error = msg;
+        if (!rowObj._errors.some(e => e.colIdx === cell.colIdx)) {
+          rowObj._errors.push({
+            colIdx: cell.colIdx,
+            code: cell.canonicalCode || cell.code,
+            error: msg,
+            value: cell.value
+          });
+        }
+      }
+
+      const idEst = getByCanonical('CLEE') || getByCanonical('ID_EST');
+      const e23 = getByCanonical('E23');
+      const tueC = getByCanonical('TUE_C');
+      const c612A = getByCanonical('C612A');
+      const g111A = getByCanonical('G111A');
+      const e08 = getByCanonical('E08');
+      const e08P = getByCanonical('E08_P');
+      const e08F = getByCanonical('E08_F');
+      const e09 = getByCanonical('E09');
+      const e09P = getByCanonical('E09_P');
+      const e09F = getByCanonical('E09_F');
+      const e09R = getByCanonical('E09R');
+      const e09Z = getByCanonical('E09Z');
+      const e09ZF = getByCanonical('E09ZF');
+      
+      const tipoE10 = getByCanonical('Tipo_E10');
+      const e10 = getByCanonical('E10');
+      
+      const tipoE10A = getByCanonical('Tipo_E10_A');
+      const e10A = getByCanonical('E10_A');
+      
+      const tipoE10B = getByCanonical('Tipo_E10_B');
+      const e10B = getByCanonical('E10_B');
+      
+      const tipoE10C = getByCanonical('Tipo_E10_C');
+      const e10C = getByCanonical('E10_C');
+
+      const e11 = getByCanonical('E11');
+      const e11A = getByCanonical('E11A');
+      const e14A = getByCanonical('E14A');
+      const e15F = getByCanonical('E15F');
+      const e15C = getByCanonical('E15C');
+      const g425A = getByCanonical('G425A');
+      const g425B = getByCanonical('G425B');
+      const imss = getByCanonical('IMSS');
+      const rfc = getByCanonical('RFC');
+      const h001 = getByCanonical('H001');
+      const m000 = getByCanonical('M000');
+
+      // 1. E23: Forma de organización
+      if (e23 && e23.value) {
+        const v = e23.value.toUpperCase();
+        if (!['M', 'S', 'MATRIZ', 'SUCURSAL', '1', '2'].includes(v)) {
+          addErr(e23, 'Debe ser Matriz (M) o Sucursal (S)');
+        }
+      }
+
+      // 2. ID_EST vs TUE_C y C612A
+      if (tueC) {
+        const valTue = tueC.value.toLowerCase();
+        const isAlta = valTue === '1' || valTue.includes('alta');
+        const isBaja = valTue === '2' || valTue.includes('baja');
+        const isNunca = valTue === '3' || valTue.includes('nunca');
+        const hasIdEst = idEst && idEst.value !== "";
+
+        if (!hasIdEst && !isAlta) {
+          addErr(tueC, 'Si no tiene ID_EST prellenado, TUE_C debe ser Alta (1)');
+        }
+        if (hasIdEst && isAlta) {
+          addErr(tueC, 'Si ya tiene ID_EST prellenado, TUE_C no puede ser Alta');
+        }
+
+        if ((isBaja || isNunca) && (!c612A || c612A.value === "")) {
+          addErr(c612A || tueC, 'Debe registrar la causa en C612A al reportar Baja (2) o Nunca ha formado parte (3)');
+        }
+
+        if (isBaja || isNunca) {
+          if (m000 && m000.value !== "") addErr(m000, 'Para Baja o Nunca ha formado parte, M000 debe estar vacío');
+          if (h001 && h001.value !== "") addErr(h001, 'Para Baja o Nunca ha formado parte, H001 debe estar vacío');
+        }
+
+        if (isAlta && (!g111A || g111A.value === "")) {
+          addErr(g111A || tueC, 'Para altas (TUE_C=1) es obligatorio registrar el año de inicio (G111A)');
+        }
+      }
+
+      // 3. G111A: Rango de año [1900 - 2026]
+      if (g111A && g111A.value !== "") {
+        const yr = parseInt(g111A.value, 10);
+        if (isNaN(yr) || yr < 1900 || yr > 2026) {
+          addErr(g111A, `Año fuera del rango válido [1900 - 2026]: "${g111A.value}"`);
+        }
+      }
+
+      // 4. Fechas condicionales
+      if (e08P) {
+        const pVal = String(e08P.value).trim();
+        if ((pVal === '3' || pVal.toLowerCase().includes('cambió')) && (!e08F || e08F.value === "")) {
+          addErr(e08F || e08P, 'Si el nombre comercial cambió (E08_P=3), debe registrar la fecha en E08_F');
+        }
+      }
+      if (e08F && e08F.value !== "") {
+        if (!isValidDateStr(e08F.value)) addErr(e08F, `Formato de fecha inválido en E08_F: "${e08F.value}"`);
+      }
+
+      if (e09P) {
+        const pVal = String(e09P.value).trim();
+        if ((pVal === '3' || pVal.toLowerCase().includes('cambió')) && (!e09F || e09F.value === "")) {
+          addErr(e09F || e09P, 'Si la razón social cambió (E09_P=3), debe registrar la fecha en E09_F');
+        }
+      }
+      if (e09F && e09F.value !== "") {
+        if (!isValidDateStr(e09F.value)) addErr(e09F, `Formato de fecha inválido en E09_F: "${e09F.value}"`);
+      }
+
+      if (e09Z) {
+        const pVal = String(e09Z.value).trim();
+        if ((pVal === '3' || pVal.toLowerCase().includes('cambió')) && (!e09ZF || e09ZF.value === "")) {
+          addErr(e09ZF || e09Z, 'Si el régimen cambió (E09Z=3), debe registrar la fecha en E09ZF');
+        }
+      }
+      if (e09ZF && e09ZF.value !== "") {
+        if (!isValidDateStr(e09ZF.value)) addErr(e09ZF, `Formato de fecha inválido en E09ZF: "${e09ZF.value}"`);
+      }
+
+      // 5. VALIDACIÓN DE NO REPETICIÓN DEL TIPO EN EL NOMBRE DE LA VIALIDAD
+      const vialidadPairs = [
+        { tipoCell: tipoE10, nombreCell: e10 },
+        { tipoCell: tipoE10A, nombreCell: e10A },
+        { tipoCell: tipoE10B, nombreCell: e10B },
+        { tipoCell: tipoE10C, nombreCell: e10C }
+      ];
+
+      vialidadPairs.forEach(pair => {
+        if (pair.nombreCell && pair.nombreCell.value) {
+          const errVialidad = validateNameRepetition(
+            pair.tipoCell ? pair.tipoCell.value : "",
+            pair.nombreCell.value
+          );
+          if (errVialidad) {
+            addErr(pair.nombreCell, errVialidad);
+          }
+        }
+      });
+
+      if (!e10 || e10.value === "") {
+        addErr(e10, 'Debe reportar el nombre de la vialidad (E10)');
+      }
+
+      const hasE11 = e11 && e11.value !== "" && e11.value !== "0";
+      const hasE11A = e11A && e11A.value !== "";
+      if (!hasE11 && !hasE11A && (!e11 || e11.value === "")) {
+        addErr(e11 || e11A, 'Debe reportar el número exterior (E11 o E11A)');
+      }
+
+      // 6. Código Postal (E14A): [01000 - 99998]
+      if (e14A && e14A.value !== "") {
+        const cpStr = e14A.value.trim();
+        const cpNum = parseInt(cpStr, 10);
+        if (!/^\d{5}$/.test(cpStr) || isNaN(cpNum) || cpNum < 1000 || cpNum > 99998) {
+          addErr(e14A, `Código postal fuera del rango [01000 - 99998]: "${cpStr}"`);
+        }
+      }
+
+      // 7. Teléfonos
+      [e15F, e15C].forEach(telCell => {
+        if (telCell && telCell.value !== "") {
+          const cleanTel = telCell.value.replace(/[\s\-\(\)]/g, '');
+          if (!/^\d{10}$/.test(cleanTel)) {
+            addErr(telCell, `El teléfono debe integrarse por 10 dígitos sin prefijos: "${telCell.value}"`);
+          }
+        }
+      });
+
+      // 8. Afiliación a cámara (G425A / G425B)
+      if (g425A && (g425A.value === '1' || g425A.value.toUpperCase() === 'SI' || g425A.value.toUpperCase() === 'SÍ')) {
+        if (!g425B || g425B.value === "") {
+          addErr(g425B || g425A, 'Si está afiliada a cámara (G425A = 1), debe registrar el nombre de la cámara (G425B)');
+        }
+      }
+
+      // 9. IMSS: Alfanumérico hasta 11 caracteres
+      if (imss && imss.value !== "") {
+        const cleanImss = imss.value.trim().replace(/[\-\s]/g, '');
+        if (!/^[a-zA-Z0-9]{1,11}$/.test(cleanImss)) {
+          addErr(imss, `El registro patronal IMSS debe ser alfanumérico de hasta 11 caracteres: "${imss.value}"`);
+        }
+      }
+
+      // 10. RFC
+      if (rfc && rfc.value !== "") {
+        const cleanRfc = rfc.value.trim().toUpperCase();
+        if (cleanRfc.length < 12 || cleanRfc.length > 13 || !/^[A-Z&Ñ0-9]+$/.test(cleanRfc)) {
+          addErr(rfc, `El RFC debe tener entre 12 y 13 caracteres válidos: "${rfc.value}"`);
+        }
+      }
+
+      // 11. Personal Ocupado (H001) e Ingresos (M000)
+      [h001, m000].forEach(numCell => {
+        if (numCell && numCell.value !== "") {
+          const val = numCell.value.trim();
+          const isPercent = /^(\d{1,2}(\.\d{1,2})?|\d{1,2})%$/.test(val);
+          const isNumeric = !isNaN(val) && Number(val) >= 0;
+          if (!isPercent && !isNumeric) {
+            addErr(numCell, `Dato inválido (debe ser número absoluto o porcentaje 00.01% - 99.99%): "${val}"`);
+          }
+        }
+      });
+    }
+
+    function validateNameRepetition(tipoVal, nombreVal) {
+      if (!nombreVal) return null;
+      const cleanNombre = String(nombreVal).trim().toUpperCase();
+      const words = cleanNombre.split(/\s+/);
+      if (words.length === 0 || words[0] === "") return null;
+
+      const firstWord = words[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const firstTwoWords = words.length >= 2 
+        ? (words[0] + " " + words[1]).normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+        : "";
+
+      if (tipoVal) {
+        let cleanTipo = String(tipoVal).trim().toUpperCase();
+        cleanTipo = cleanTipo.replace(/^\d+\s*/, '');
+        cleanTipo = cleanTipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        if (cleanTipo && cleanTipo.length >= 3) {
+          if (firstWord === cleanTipo || firstTwoWords === cleanTipo) {
+            return `No debe repetir '${tipoVal}' en el nombre de la vialidad`;
+          }
+        }
+      }
+
+      for (let cat of VIALIDADES_CATALOGO) {
+        const catNorm = cat.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (firstWord === catNorm || firstTwoWords === catNorm) {
+          return `El nombre de la vialidad no debe incluir '${cat}' al inicio`;
+        }
+      }
+
+      return null;
+    }
+
+    function isValidDateStr(s) {
+      if (!s) return false;
+      const clean = String(s).trim();
+      return /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$\vert{}^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(clean);
     }
 
     function renderTable() {
@@ -410,7 +631,7 @@
       document.getElementById('tableRecordInfo').innerText = `${filtered.length} de ${parsedRows.length} registros`;
 
       if (filtered.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400">No se encontraron registros con los filtros actuales.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400">No se encontraron registros con los filtros seleccionados.</td></tr>`;
         return;
       }
 
@@ -418,16 +639,16 @@
         const rIdx = row._rowIdx;
         const dec = auditDecisions[rIdx];
 
-        const clee = getValByPattern(row, ['CLEE', 'ID_EST']) || 'N/A';
-        const nombre = getValByPattern(row, ['E08']) || getValByPattern(row, ['Nombre']) || 'Sin nombre';
+        const clee = getValByCanonical(row, 'CLEE') || getValByCanonical(row, 'ID_EST') || 'N/A';
+        const nombre = getValByCanonical(row, 'E08') || 'Sin nombre';
         
-        // Celdas clave y su estado de error
-        const cellE23 = getCellObj(row, 'E23');
-        const cellE10 = getCellObj(row, 'E10', 'Tipo_E10');
-        const cellH001 = getCellObj(row, 'H001') || getCellObjByPattern(row, ['personal']);
-        const cellM000 = getCellObj(row, 'M000') || getCellObjByPattern(row, ['ingresos global']);
-        const cellG425B = getCellObj(row, 'G425B');
-        const cellG111A = getCellObj(row, 'G111A');
+        const cellE23 = getCellByCanonical(row, 'E23');
+        const cellE10 = getCellByCanonical(row, 'E10');
+        const cellH001 = getCellByCanonical(row, 'H001');
+        const cellM000 = getCellByCanonical(row, 'M000');
+        const cellG425B = getCellByCanonical(row, 'G425B');
+        const cellG111A = getCellByCanonical(row, 'G111A');
+        const cellImss = getCellByCanonical(row, 'IMSS');
 
         const badgeClass = {
           'CORRECTO': 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -439,14 +660,14 @@
 
         return `
           <tr class="hover:bg-slate-50 transition border-b border-slate-100 ${hasErrors ? 'bg-rose-50/20' : ''}">
-            <!-- Selección de Dictamen -->
+            <!-- Dictamen -->
             <td class="p-3 align-top text-center">
               <div class="inline-flex flex-col gap-1.5 items-center">
                 <span class="px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}">
                   ${dec.status}
                 </span>
                 <div class="flex gap-1">
-                  <button onclick="setDecision(${rIdx}, 'CORRECTO')" title="Validado Correcto" class="w-7 h-7 rounded bg-white hover:bg-emerald-50 text-emerald-600 border border-slate-200 hover:border-emerald-400 shadow-xs flex items-center justify-center transition">
+                  <button onclick="setDecision(${rIdx}, 'CORRECTO')" title="Aprobar (Correcto)" class="w-7 h-7 rounded bg-white hover:bg-emerald-50 text-emerald-600 border border-slate-200 hover:border-emerald-400 shadow-xs flex items-center justify-center transition">
                     <i class="fa-solid fa-check"></i>
                   </button>
                   <button onclick="setDecision(${rIdx}, 'CORREGIR')" title="Marcar para Corregir" class="w-7 h-7 rounded bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-400 shadow-xs flex items-center justify-center transition">
@@ -466,29 +687,32 @@
               </button>
             </td>
 
-            <!-- Observaciones de Auditoría -->
+            <!-- Observaciones del Auditor -->
             <td class="p-3 align-top">
               <textarea 
                 onchange="updateNotes(${rIdx}, this.value)" 
-                placeholder="Observaciones de validación o inconsistencias..." 
-                class="w-full text-xs p-2 border rounded-md border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none h-20 bg-white"
+                placeholder="Observaciones de auditoría o inconsistencias..." 
+                class="w-full text-xs p-2 border rounded-md border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none h-24 bg-white"
               >${dec.notes}</textarea>
             </td>
 
-            <!-- Ficha del Establecimiento con Marcado en Rojo -->
+            <!-- Ficha del Establecimiento -->
             <td class="p-3 align-top space-y-2">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-bold text-slate-900 text-sm">${nombre}</span>
                 
-                <!-- Tipo UE (E23) -->
+                <!-- E23 Matriz/Sucursal -->
                 ${renderBadgeVariable(cellE23, 'Matriz/Sucursal')}
                 
                 <span class="text-slate-400 text-xs">| CLEE: <code class="font-mono text-slate-700 font-semibold">${clee}</code></span>
 
-                <!-- Año de Inicio (G111A) -->
+                <!-- Año de Inicio G111A -->
                 ${cellG111A && cellG111A.value ? renderBadgeVariable(cellG111A, 'Año Inicio: ' + cellG111A.value) : ''}
 
-                <!-- Alerta Global de Inconsistencias -->
+                <!-- Registro IMSS Alfanumérico -->
+                ${cellImss && cellImss.value ? renderBadgeVariable(cellImss, 'IMSS: ' + cellImss.value) : ''}
+
+                <!-- Alerta de Inconsistencias -->
                 ${hasErrors ? `<span class="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation"></i> ${row._errors.length} fuera de norma</span>` : ''}
               </div>
 
@@ -496,12 +720,12 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                 
                 <!-- E10 Vialidad -->
-                <div class="p-1 rounded ${cellE10 && cellE10.error ? 'bg-rose-100 border border-rose-300' : ''}">
+                <div class="p-1 rounded ${cellE10 && cellE10.error ? 'bg-rose-100 border border-rose-300 ring-1 ring-rose-400' : ''}">
                   <span class="text-[10px] font-bold ${cellE10 && cellE10.error ? 'text-rose-700' : 'text-slate-500'} block uppercase">Vialidad (E10):</span>
-                  <span class="font-medium ${cellE10 && cellE10.error ? 'text-rose-800 font-bold' : 'text-slate-800'}">
+                  <span class="font-medium ${cellE10 && cellE10.error ? 'text-rose-900 font-bold' : 'text-slate-800'}">
                     ${cellE10 && cellE10.value ? cellE10.value : '<span class="text-slate-400 italic">No especificada</span>'}
                   </span>
-                  ${cellE10 && cellE10.error ? `<span class="block text-[9px] text-rose-600">${cellE10.error}</span>` : ''}
+                  ${cellE10 && cellE10.error ? `<span class="block text-[9px] text-rose-600 font-bold mt-0.5">${cellE10.error}</span>` : ''}
                 </div>
 
                 <!-- Personal Ocupado H001 -->
@@ -510,7 +734,7 @@
                   <span class="font-semibold ${cellH001 && cellH001.error ? 'text-rose-700' : (cellH001 && cellH001.value ? 'text-emerald-700' : 'text-slate-400 italic')}">
                     ${cellH001 && cellH001.value ? cellH001.value + ' personas' : 'Sin desglose'}
                   </span>
-                  ${cellH001 && cellH001.error ? `<span class="block text-[9px] text-rose-600">${cellH001.error}</span>` : ''}
+                  ${cellH001 && cellH001.error ? `<span class="block text-[9px] text-rose-600 font-semibold">${cellH001.error}</span>` : ''}
                 </div>
 
                 <!-- Ingresos M000 -->
@@ -519,7 +743,7 @@
                   <span class="font-semibold ${cellM000 && cellM000.error ? 'text-rose-700' : (cellM000 && cellM000.value ? 'text-blue-700' : 'text-slate-400 italic')}">
                     ${cellM000 && cellM000.value ? '$' + Number(cellM000.value).toLocaleString() : 'N/A'}
                   </span>
-                  ${cellM000 && cellM000.error ? `<span class="block text-[9px] text-rose-600">${cellM000.error}</span>` : ''}
+                  ${cellM000 && cellM000.error ? `<span class="block text-[9px] text-rose-600 font-semibold">${cellM000.error}</span>` : ''}
                 </div>
 
                 <!-- Cámara / Asoc G425B -->
@@ -528,7 +752,7 @@
                   <span class="font-medium ${cellG425B && cellG425B.error ? 'text-rose-800 font-bold' : 'text-slate-800'}">
                     ${cellG425B && cellG425B.value ? cellG425B.value : '<span class="text-slate-400 italic">Ninguna</span>'}
                   </span>
-                  ${cellG425B && cellG425B.error ? `<span class="block text-[9px] text-rose-600">${cellG425B.error}</span>` : ''}
+                  ${cellG425B && cellG425B.error ? `<span class="block text-[9px] text-rose-600 font-semibold">${cellG425B.error}</span>` : ''}
                 </div>
               </div>
             </td>
@@ -549,31 +773,16 @@
       return `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded text-[11px] font-semibold">${val}</span>`;
     }
 
-    function getCellObj(row, codeMatch, excludePrefix = null) {
+    function getCellByCanonical(row, canonicalCode) {
       for (let colIdx in row._cells) {
         const cell = row._cells[colIdx];
-        const c = (cell.code || "").trim();
-        if (excludePrefix && c.startsWith(excludePrefix)) continue;
-        if (c.startsWith(codeMatch)) {
-          return cell;
-        }
+        if (cell.canonicalCode === canonicalCode) return cell;
       }
       return null;
     }
 
-    function getCellObjByPattern(row, terms) {
-      for (let colIdx in row._cells) {
-        const cell = row._cells[colIdx];
-        const full = (cell.code + " " + cell.desc).toLowerCase();
-        if (terms.some(t => full.includes(t.toLowerCase()))) {
-          return cell;
-        }
-      }
-      return null;
-    }
-
-    function getValByPattern(row, terms) {
-      const cell = getCellObjByPattern(row, terms);
+    function getValByCanonical(row, canonicalCode) {
+      const cell = getCellByCanonical(row, canonicalCode);
       return cell ? cell.value : "";
     }
 
@@ -595,12 +804,12 @@
       const totalErrors = parsedRows.filter(r => r._errors.length > 0).length;
 
       document.getElementById('countTotal').innerText = `Total: ${total}`;
-      document.getElementById('countErrors').innerText = `Con Inconsistencias FD: ${totalErrors}`;
-      document.getElementById('countValid').innerText = `Marcados Correctos: ${valid}`;
+      document.getElementById('countErrors').innerText = `Con Inconsistencias: ${totalErrors}`;
+      document.getElementById('countValid').innerText = `Validados Correctos: ${valid}`;
       document.getElementById('countCorregir').innerText = `Por Corregir: ${invalid}`;
     }
 
-    // MODAL DE DETALLE (SOLO LECTURA CON RESALTADO EN ROJO)
+    // MODAL DE DETALLE (SOLO LECTURA)
     function openModal(rowIndex) {
       const item = parsedRows.find(r => r._rowIdx === rowIndex);
       if (!item) return;
@@ -611,18 +820,18 @@
 
       let fieldsHtml = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
       for (const [colIdx, cell] of Object.entries(item._cells)) {
-        if (!cell.code && !cell.desc) continue;
+        if (!cell.code && !cell.desc && !cell.canonicalCode) continue;
 
         const isError = !!cell.error;
         const boxClass = isError 
-          ? 'bg-rose-50 border-rose-300 ring-1 ring-rose-400' 
+          ? 'bg-rose-50 border-rose-400 ring-1 ring-rose-400' 
           : 'bg-slate-50 border-slate-200';
 
         fieldsHtml += `
           <div class="p-2.5 rounded-lg border ${boxClass} flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between text-[11px] mb-1">
-                <span class="font-bold ${isError ? 'text-rose-700' : 'text-blue-600'}">${cell.code || 'Campo'}</span>
+                <span class="font-bold ${isError ? 'text-rose-700' : 'text-blue-600'}">${cell.canonicalCode || cell.code || 'Campo'}</span>
                 ${isError ? '<span class="text-[10px] bg-rose-600 text-white font-bold px-1.5 py-0.2 rounded">FUERA DE NORMA</span>' : ''}
                 <span class="text-[10px] text-slate-400">Col ${Number(colIdx)+1}</span>
               </div>
@@ -634,7 +843,7 @@
               ${cell.value !== "" ? cell.value : '<span class="text-slate-300 italic">(Vacío)</span>'}
             </div>
 
-            <!-- MENSAJE DE VALIDACIÓN EN ROJO -->
+            <!-- MOTIVO DE LA INCONSISTENCIA EN ROJO -->
             ${isError ? `
               <div class="mt-1.5 text-[10px] font-semibold text-rose-700 flex items-start gap-1">
                 <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
@@ -681,15 +890,14 @@
         let flatRow = {
           'FILA_ORIGINAL': row._rowIdx + 1,
           'DICTAMEN_AUDITORIA': dec.status,
-          'TOTAL_INCONSISTENCIAS_FD': row._errors.length,
-          'DETALLE_ERRORES': errorSummary || 'Sin inconsistencias',
+          'TOTAL_INCONSISTENCIAS_RENEM': row._errors.length,
+          'DETALLE_INCONSISTENCIAS': errorSummary || 'Sin inconsistencias',
           'OBSERVACIONES': dec.notes
         };
 
-        // Adjuntar columnas originales
         for (let colIdx in row._cells) {
           const c = row._cells[colIdx];
-          const colHeader = c.code || c.label || `Col_${colIdx}`;
+          const colHeader = c.canonicalCode || c.code || c.label || `Col_${colIdx}`;
           flatRow[colHeader] = c.value;
         }
 
